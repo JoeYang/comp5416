@@ -7,9 +7,9 @@
 #include <limits.h>
 
 #define NEW(type) (type *) malloc(sizeof(type))
-#define ARRIVAL 1
-#define DEPARTURE 2
-#define NUM_SERVERS	10
+#define ARRIVAL 	1
+#define DEPARTURE	2
+#define NUM_HOSTS	10
 
 /* Event by event simulation of a router queue with finite waiting
    room */
@@ -29,8 +29,6 @@ int
   buffer_size,       /* max buffer size to hold packets */		
   mean_pkt_length,   /* mean packet length */
   total_events;      /* number of events to be simulated */
-
-float probablity;
 
 long
   seed;   /* seed for the random number generator */
@@ -61,22 +59,13 @@ void arrival(void);
 void departure(void);
 void schedule(double, int);
 void sim_init(void);
-float run(void);
 
 /**************************************************************************/
-int main(){
-	
-	probablity = 0;
-	int i = 0;
-	for(; i< 30; i++){
-		probablity += run();
-	}	
-	printf("The mean probablity is %f\n", probablity/30);	
-	return 0;	
-}
+main(){
 
-float run(){
-	 sim_init();			
+  sim_init();
+
+int i;
   while (narr < total_events){
     switch (act()){
       case ARRIVAL:
@@ -95,17 +84,20 @@ float run(){
          ((float) q_sum) / narr);
   printf("Probablity a packet is blocked is: %8.4f\n",
          ((float) nloss) / narr);
-         
-	return (((float) nloss) / narr);
+
+  return(0);
+
 } /* end main */
 /**************************************************************************/
 double negexp(double mean) /* returns a negexp rv with mean `mean' */
+
 {
   return (- log(drand48()) * mean);
 }
 
 /**************************************************************************/
 double srv_time(int pkt_length) /* returns the service time for given length */
+
 {
   double service_time = (pkt_length*8.0)/(r_capacity*pow(10.0,6.0));
   return (service_time);
@@ -113,6 +105,7 @@ double srv_time(int pkt_length) /* returns the service time for given length */
 
 /**************************************************************************/
 void arrival() /* a customer arrives */
+
 {
   struct packet_info *t, *x;
   narr += 1;                /* keep tally of number of arrivals */
@@ -120,7 +113,11 @@ void arrival() /* a customer arrives */
   schedule(negexp(iat), ARRIVAL); /* schedule the next arrival */
 
   int new_pkt_len = (int)(-log(drand48()) * mean_pkt_length); 
-  if ((new_pkt_len+q_len) <= buffer_size) {
+  double utilisation = (q_len/(iat*1024*128))/10;
+  if(utilisation>0.9){
+  		nloss += 1;
+  	}
+  else if ((new_pkt_len+q_len) <= buffer_size) {
   /* still space in buffer */
     q += 1;
     q_len += new_pkt_len;
@@ -140,6 +137,7 @@ void arrival() /* a customer arrives */
 
 /**************************************************************************/
 void departure()  /* a customer departs */
+
 {
   struct packet_info *x;
 
@@ -159,55 +157,53 @@ void departure()  /* a customer departs */
 void schedule(double time_interval, int event)  /* Schedules an event of type */
                                              /* 'event' at time 'time_interval' 
                                                  in the future */
+
 {
-	double 
-	  event_time;
-	
-	struct schedule_info
-	  *x,
-	  *t;
-	
-	event_time = gmt + time_interval;
-	t = NEW(EVENTLIST);
-	for(x=head ; x->next->time<event_time && x->next!=tail ; x=x->next);
-	t->time = event_time;
-	t->event_type = event;
-	t->next = x->next;
-	x->next = t;
+double 
+  event_time;
+
+struct schedule_info
+  *x,
+  *t;
+
+event_time = gmt + time_interval;
+t = NEW(EVENTLIST);
+for(x=head ; x->next->time<event_time && x->next!=tail ; x=x->next);
+t->time = event_time;
+t->event_type = event;
+t->next = x->next;
+x->next = t;
 }
 /**************************************************************************/
 int act()    /* find the next event  and go to it */
 {
-	int 
-	  type;
-	struct schedule_info 
-	  *x;
-	
-	gmt = head->next->time; /* step time forward to the next event */
-	type = head->next->event_type; /*  Record type of this next event */
-	x = head->next;                 /* Delete event from linked list */
-	head->next = head->next->next;
-	free(x);
-	return type; /* return value is type of the next event */
+int 
+  type;
+struct schedule_info 
+  *x;
+
+gmt = head->next->time; /* step time forward to the next event */
+type = head->next->event_type; /*  Record type of this next event */
+x = head->next;                 /* Delete event from linked list */
+head->next = head->next->next;
+free(x);
+return type; /* return value is type of the next event */
 }
 /*************************************************************************/
 /**************************************************************************/
 void sim_init()
 /* initialise the simulation */
+
 { 
   int iar;
 
-  printf("\nenter the mean packet arrival rate (pkts/sec) and the mean packet length (octets)\n");
-  scanf("%d%d", &iar, &mean_pkt_length);
-  printf("\nenter the router transmission capacity (Mbps)\n");
-  scanf("%d", &r_capacity);
-  printf("\nenter the max buffer size (KB)\n");
-  scanf("%d", &buffer_size);
-  printf("enter the total number of packets to be simulated\n");
-  scanf("%d", &total_events);
-
+  printf("\nenter the mean packet arrival rate (pkts/sec) and the max buffer size (KB) \n");
+  scanf("%d %d", &iar, &buffer_size);
+  
   /* providing automated seed from system time */
-
+  seed = time(NULL);
+  srand48(seed);
+	srand(seed);
   head = NEW(EVENTLIST);
   tail = NEW(EVENTLIST);
   head->next = tail;
@@ -217,10 +213,11 @@ void sim_init()
   tailPkt = NEW(PACKET_Q);
   headPkt->next = tailPkt;
   tailPkt->next = tailPkt;
-
-  srand48(time(NULL));
-
-
+  
+  total_events = rand()%99000 + 1000;
+  mean_pkt_length = 1000;
+  r_capacity = 10;
+  
   gmt = 0.0;
   q = 0;
   narr = 0;
