@@ -10,6 +10,7 @@
 #define ARRIVAL 	1
 #define DEPARTURE	2
 #define NUM_HOSTS	10
+#define TOTAL_SIZE	100
 
 /* Event by event simulation of a router queue with finite waiting
    room */
@@ -59,17 +60,49 @@ void arrival(void);
 void departure(void);
 void schedule(double, int);
 void sim_init(void);
+float run();
 
 /**************************************************************************/
-main(){
+int main(){
+	seed = time(NULL);
+	int iter;
+	float avg = 1;
+	float current;
+	int counter;
+	int if_continue = 1;
+	buffer_size = 30;
+	
+	while(if_continue){		
+		avg = 0;
+		for(iter=0; iter<TOTAL_SIZE; ++iter){
+			sim_init();
+			current = run();
+			avg += current;
+			if(current>0.001)
+				counter++;
+			buffer_size /= 1024;	
+		}
+		printf("The block probablity for buffer size %d is %.6f, the confident interval is %f\n", buffer_size, avg/100, 
+				(TOTAL_SIZE-counter)*1.0/TOTAL_SIZE);
+		if(avg<0.001 && counter<=5){
+			if_continue = 0;
+		}	
+		buffer_size++;
+		counter = 0;
+		avg = 0;		
+	}
 
-  sim_init();
+	return 0;	
+}
 
+
+float run(){
 int i;
   while (narr < total_events){
     switch (act()){
       case ARRIVAL:
         arrival();
+      
         break;
       case DEPARTURE:
         departure();
@@ -80,12 +113,13 @@ int i;
         break;
       } /* end switch */
   }      /* end while */
-  printf("The mean queue length seen by arriving customers is: %8.4f\n",
+/*  printf("The mean queue length seen by arriving customers is: %8.4f\n",
          ((float) q_sum) / narr);
   printf("Probablity a packet is blocked is: %8.4f\n",
          ((float) nloss) / narr);
-
-  return(0);
+ */ 
+  fprintf (stderr, "%.6f\n", ((float) nloss) / narr);
+  return ((float) nloss) / narr;
 
 } /* end main */
 /**************************************************************************/
@@ -113,7 +147,7 @@ void arrival() /* a customer arrives */
   schedule(negexp(iat), ARRIVAL); /* schedule the next arrival */
 
   int new_pkt_len = (int)(-log(drand48()) * mean_pkt_length); 
-  double utilisation = (q_len/(iat*1024*128))/10;
+  double utilisation =  (q_len * 8 * iat)/(pow(10.0, 6.0));
   if(utilisation>0.9){
   		nloss += 1;
   	}
@@ -196,12 +230,9 @@ void sim_init()
 
 { 
   int iar;
-
-  printf("\nenter the mean packet arrival rate (pkts/sec) and the max buffer size (KB) \n");
-  scanf("%d %d", &iar, &buffer_size);
   
   /* providing automated seed from system time */
-  seed = time(NULL);
+  seed++;
   srand48(seed);
 	srand(seed);
   head = NEW(EVENTLIST);
@@ -217,7 +248,7 @@ void sim_init()
   total_events = rand()%99000 + 1000;
   mean_pkt_length = 1000;
   r_capacity = 10;
-  
+  iar = 1125;
   gmt = 0.0;
   q = 0;
   narr = 0;
