@@ -15,10 +15,14 @@
 #define NUM_HOSTS 10         /* number of hosts */
 #define BUFFER_SIZE 41984    /* max buffer size to hold packets */
 #define TOTAL_EVENTS 10000   /* number of events to be simulated */
+#define R (BUFFER_SIZE * 0.75) /* threshold parameter which triggers discard of packet */
+#define Z 0.95
 
 double 
-gmt,    /* absolute time */
-iat;    /* mean interarrival time */
+gmt,        /* absolute time */
+iat,        /* mean interarrival time */
+W,          /* weight ratio for each host */
+total_time; /* the total amount of time that packets spent in the system */
 
 int
 q,             /* number of packets in the system */
@@ -30,6 +34,7 @@ q_len,         /* queue length n octets */
 iar,           /* mean packet arrival rate */
 batch_size,    /* number of packets in each batch arrival */     
 num_packets,   /* the number of packets to add to the buffer in an arrrival */
+batch_qlen, /* sum of the packet lengths that the batch process has in the system */
 total_packets, /* total number of packets that passed through the system */
 batch_arrival, /* keeps track of whether an arrival is a batch or single arrival */
 batch_interval;/* keeps track of when the next batch process should be scheduled */
@@ -44,7 +49,9 @@ typedef struct schedule_info{
 } EVENTLIST;
 
 typedef struct packet_info{
-	int pkt_len;                       /* Length of packet */ 			
+	int pkt_len;                       /* Length of packet */ 
+	int batch;						   /* keeps track of whether a particular packet is part of a batch arrival */
+	double arrival_time;			   /* time that the packet arrived in the system */
 	struct packet_info *next;          /* Pointer to next packet in linked list */
 } PACKET_Q;
 
@@ -88,6 +95,8 @@ main(){
 	printf("Probablity a packet is blocked - batch arrival: %8.4f single packet arrival: %8.4f\n",
 		   ((float) batch_nloss) / total_packets, ((float) nloss) / total_packets);
 	
+	printf("Mean packet delay in the gateway was: %f\n", total_time / total_packets);
+	
 	return(0);
 	
 } /* end main */
@@ -122,23 +131,43 @@ void arrival() /* a customer arrives */
 			batch_arrival = 1;
 	}
 	else {
-			  num_packets = 1;
-			  batch_arrival = 0;
+		num_packets = 1;
+		batch_arrival = 0;
 	}
 	
 	/* Create the appropriate number of packets for the type of arrival */
 	for (i = 0; i < num_packets; ++i) { 
 		total_packets += 1;
 		int new_pkt_len = (int)(-log(drand48()) * MEAN_PKT_LENGTH); 
-		if ((new_pkt_len+q_len) <= BUFFER_SIZE) {
+		
+		if (q_len == 0) {
+			W = 0;
+		}
+		else {
+			if (batch_arrival) {
+				W = (batch_qlen / (q_len / NUM_HOSTS));
+			}
+			else {
+				W = (q_len - batch_qlen) / (q_len / NUM_HOSTS) / (NUM_HOSTS - BATCH_HOSTS);
+			}
+		}
+		
+		if (!(q_len > R && W > (Z * ((BUFFER_SIZE - R)/(q_len - R))))) {
 			/* still space in buffer */
 			q += 1;
 			q_len += new_pkt_len;
 			t = NEW(PACKET_Q);
 			for(x=headPkt ; x->next!=tailPkt ; x=x->next);
 			t->pkt_len = new_pkt_len;
+			t->arrival_time = gmt;
 			t->next = x->next;
 			x->next = t;
+			
+			if (batch_arrival) {
+				batch_qlen += new_pkt_len;
+				t->batch = 1;
+			}
+			
 			if (q == 1)
 				schedule(srv_time(headPkt->next->pkt_len), DEPARTURE);
 		}
@@ -159,10 +188,15 @@ void departure()  /* a customer departs */
 
 {
 	struct packet_info *x;
-	
 	q -= 1;
 	x = headPkt->next;                 /* Delete event from linked list */
 	q_len -= x->pkt_len;
+	total_time += gmt - x->arrival_time;
+	
+	if (x->batch) {
+		batch_qlen -= x->pkt_len;
+	}
+	
 	headPkt->next = headPkt->next->next;
 	free(x);
 	if (q > 0)
@@ -239,6 +273,9 @@ void sim_init()
 	batch_nloss = 0;
 	q_sum = 0;
 	q_len = 0;
+	W = 0;
+	batch_qlen = 0;
+	total_time = 0;
 	batch_size = iar/BAR; 
 	iar = (BATCH_HOSTS * BAR) + ((NUM_HOSTS - BATCH_HOSTS) * iar);
 	batch_interval = iar / (BAR * BATCH_HOSTS);
