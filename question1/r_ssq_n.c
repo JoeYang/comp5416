@@ -61,10 +61,12 @@ void departure(void);
 void schedule(double, int);
 void sim_init(void);
 float run();
+float sdv(float *num, float mean, int size);
 
 /**************************************************************************/
 int main(){
 	seed = time(NULL);
+	float prob[TOTAL_SIZE];
 	int iter;
 	float avg = 1;
 	float current;
@@ -72,7 +74,7 @@ int main(){
 	int if_continue = 1;
 	buffer_size = 30;
 	
-	while(if_continue){		
+	while(if_continue){
 		avg = 0;
 		for(iter=0; iter<TOTAL_SIZE; ++iter){
 			sim_init();
@@ -80,21 +82,32 @@ int main(){
 			avg += current;
 			if(current>0.001)
 				counter++;
-			buffer_size /= 1024;	
+			buffer_size /= 1024;
+			prob[iter] = current;
 		}
-		printf("The block probablity for buffer size %d is %.6f, the confident interval is %f\n", buffer_size, avg/100, 
-				(TOTAL_SIZE-counter)*1.0/TOTAL_SIZE);
-		if(avg<0.001 && counter<=5){
+		printf("%d %.6f %0.6f\n", buffer_size, avg/100, 
+				1.96*sdv(prob, avg/100, TOTAL_SIZE)/sqrt(TOTAL_SIZE));
+		if(counter<=5){
 			if_continue = 0;
 		}	
 		buffer_size++;
 		counter = 0;
-		avg = 0;		
+		avg = 0;
+		fprintf (stderr, "******************   %d  *********************", buffer_size-1);		
 	}
 
 	return 0;	
 }
 
+float sdv(float *num, float mean, int size){
+	int i = 0;
+	float dv;
+	for(; i<size; ++i){
+		dv += (num[i]-mean)*(num[i]-mean);
+	}
+	dv /= size;
+	return sqrt(dv);
+}
 
 float run(){
 int i;
