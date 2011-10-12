@@ -31,6 +31,7 @@ iar,           /* mean packet arrival rate */
 batch_size,    /* number of packets in each batch arrival */     
 num_packets,   /* the number of packets to add to the buffer in an arrrival */
 total_packets, /* total number of packets that passed through the system */
+batch_packets, /* number of batch packets that passed through the system */
 batch_arrival, /* keeps track of whether an arrival is a batch or single arrival */
 batch_interval;/* keeps track of when the next batch process should be scheduled */
 
@@ -85,8 +86,8 @@ main(){
 		} /* end switch */
 	}      /* end while */
 
-	printf("Probablity a packet is blocked - batch arrival: %8.4f single packet arrival: %8.4f\n",
-		   ((float) batch_nloss) / total_packets, ((float) nloss) / total_packets);
+	printf("Probablity a packet is blocked - batch arrival:, %8.4f, single packet arrival:, %8.4f\n",
+		   ((float) batch_nloss) / batch_packets, ((float) nloss) / (total_packets - batch_packets));
 	
 	return(0);
 	
@@ -118,12 +119,13 @@ void arrival() /* a customer arrives */
 	
 	/* check whether to schedule a batch or individual packet arrival */
 	if (batch_interval == 1 || narr % batch_interval == 0) {
-			num_packets = batch_size;
-			batch_arrival = 1;
+		num_packets = batch_size;
+		batch_arrival = 1;
+		batch_packets += num_packets;
 	}
 	else {
-			  num_packets = 1;
-			  batch_arrival = 0;
+		num_packets = 1;
+		batch_arrival = 0;
 	}
 	
 	/* Create the appropriate number of packets for the type of arrival */
@@ -215,7 +217,7 @@ void sim_init()
 
 { 
 	
-    printf("\nenter the mean packet arrival rate (pkts/sec)\n");
+    //printf("\nenter the mean packet arrival rate (pkts/sec)\n");
 	scanf("%d", &iar);
 	
 	/* providing automated seed from system time */
@@ -239,6 +241,8 @@ void sim_init()
 	batch_nloss = 0;
 	q_sum = 0;
 	q_len = 0;
+	total_packets = 0;
+	batch_packets = 0;
 	batch_size = iar/BAR; 
 	iar = (BATCH_HOSTS * BAR) + ((NUM_HOSTS - BATCH_HOSTS) * iar);
 	batch_interval = iar / (BAR * BATCH_HOSTS);

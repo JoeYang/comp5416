@@ -22,7 +22,9 @@ double
 gmt,        /* absolute time */
 iat,        /* mean interarrival time */
 W,          /* weight ratio for each host */
-total_time; /* the total amount of time that packets spent in the system */
+batch_time, /* time that batched packets spent in the system */
+packet_time; /* time that individual packets spent in the system */
+
 
 int
 q,             /* number of packets in the system */
@@ -34,8 +36,9 @@ q_len,         /* queue length n octets */
 iar,           /* mean packet arrival rate */
 batch_size,    /* number of packets in each batch arrival */     
 num_packets,   /* the number of packets to add to the buffer in an arrrival */
-batch_qlen, /* sum of the packet lengths that the batch process has in the system */
+batch_qlen,    /* sum of the packet lengths that the batch process has in the system */
 total_packets, /* total number of packets that passed through the system */
+batch_packets, /* number of batch packets that passed through the system */
 batch_arrival, /* keeps track of whether an arrival is a batch or single arrival */
 batch_interval;/* keeps track of when the next batch process should be scheduled */
 
@@ -91,11 +94,13 @@ main(){
 				break;
 		} /* end switch */
 	}      /* end while */
-
-	printf("Probablity a packet is blocked - batch arrival: %8.4f single packet arrival: %8.4f\n",
-		   ((float) batch_nloss) / total_packets, ((float) nloss) / total_packets);
 	
-	printf("Mean packet delay in the gateway was: %f\n", total_time / total_packets);
+			//printf("Probablity a packet is blocked - batch arrival: %8.4f single packet arrival: %8.4f\n",
+	 //((float) batch_nloss) / total_packets, ((float) nloss) / total_packets, total_time / total_packets);
+	//printf("Mean packet delay in the gateway was: %f\n", total_time / total_packets);
+	
+	printf("%d, %d, %d %d\n", batch_nloss, nloss, total_packets, batch_packets);
+	printf("%f,%f,%f,%f\n", ((float) batch_nloss) / batch_packets, ((float) nloss) / (total_packets - batch_packets), ((float)batch_time / batch_packets), ((float) packet_time) / (total_packets - batch_packets));
 	
 	return(0);
 	
@@ -127,8 +132,9 @@ void arrival() /* a customer arrives */
 	
 	/* check whether to schedule a batch or individual packet arrival */
 	if (batch_interval == 1 || narr % batch_interval == 0) {
-			num_packets = batch_size;
-			batch_arrival = 1;
+		num_packets = batch_size;
+		batch_arrival = 1;
+		batch_packets += num_packets;
 	}
 	else {
 		num_packets = 1;
@@ -145,10 +151,10 @@ void arrival() /* a customer arrives */
 		}
 		else {
 			if (batch_arrival) {
-				W = (batch_qlen / (q_len / NUM_HOSTS));
+				W = (batch_qlen / ((float) q_len)) / NUM_HOSTS;
 			}
 			else {
-				W = (q_len - batch_qlen) / (q_len / NUM_HOSTS) / (NUM_HOSTS - BATCH_HOSTS);
+				W = (q_len - batch_qlen) / ((float) q_len / NUM_HOSTS) / (((float) NUM_HOSTS) - BATCH_HOSTS);
 			}
 		}
 		
@@ -191,10 +197,13 @@ void departure()  /* a customer departs */
 	q -= 1;
 	x = headPkt->next;                 /* Delete event from linked list */
 	q_len -= x->pkt_len;
-	total_time += gmt - x->arrival_time;
 	
 	if (x->batch) {
 		batch_qlen -= x->pkt_len;
+		batch_time += gmt - x->arrival_time;
+	}
+	else {
+		packet_time += gmt - x->arrival_time;
 	}
 	
 	headPkt->next = headPkt->next->next;
@@ -249,7 +258,7 @@ void sim_init()
 
 { 
 	
-    printf("\nenter the mean packet arrival rate (pkts/sec)\n");
+    //printf("\nenter the mean packet arrival rate (pkts/sec)\n");
 	scanf("%d", &iar);
 	
 	/* providing automated seed from system time */
@@ -275,7 +284,10 @@ void sim_init()
 	q_len = 0;
 	W = 0;
 	batch_qlen = 0;
-	total_time = 0;
+	batch_time = 0;
+	packet_time = 0;
+	batch_packets = 0;
+	total_packets = 0;
 	batch_size = iar/BAR; 
 	iar = (BATCH_HOSTS * BAR) + ((NUM_HOSTS - BATCH_HOSTS) * iar);
 	batch_interval = iar / (BAR * BATCH_HOSTS);
