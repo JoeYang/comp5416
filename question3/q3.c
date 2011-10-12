@@ -86,7 +86,7 @@ main(){
 		} /* end switch */
 	}      /* end while */
 
-	printf("Probablity a packet is blocked - batch arrival:, %8.4f, single packet arrival:, %8.4f\n",
+	printf("Probablity a packet is blocked: \nbatch arrival: %8.4f \nsingle packet arrival: %8.4f\n",
 		   ((float) batch_nloss) / batch_packets, ((float) nloss) / (total_packets - batch_packets));
 	
 	return(0);
@@ -217,7 +217,7 @@ void sim_init()
 
 { 
 	
-    //printf("\nenter the mean packet arrival rate (pkts/sec)\n");
+    printf("\nenter the mean packet arrival rate (pkts/sec)\n");
 	scanf("%d", &iar);
 	
 	/* providing automated seed from system time */
