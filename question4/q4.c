@@ -36,7 +36,7 @@ q_len,         /* queue length n octets */
 iar,           /* mean packet arrival rate */
 batch_size,    /* number of packets in each batch arrival */     
 num_packets,   /* the number of packets to add to the buffer in an arrrival */
-batch_qlen,    /* sum of the packet lengths that the batch process has in the system */
+batch_qlen,    /* sum of the batch packet lengths in q_len */
 total_packets, /* total number of packets that passed through the system */
 batch_packets, /* number of batch packets that passed through the system */
 batch_arrival, /* keeps track of whether an arrival is a batch or single arrival */
@@ -151,10 +151,10 @@ void arrival() /* a customer arrives */
 		}
 		else {
 			if (batch_arrival) {
-				W = (batch_qlen / ((float) q_len)) / NUM_HOSTS;
+				W = (batch_qlen * NUM_HOSTS)/ ((float) q_len);
 			}
 			else {
-				W = (q_len - batch_qlen) / ((float) q_len / NUM_HOSTS) / (((float) NUM_HOSTS) - BATCH_HOSTS);
+				W = (((q_len - batch_qlen) * NUM_HOSTS) / ((float) q_len)) / (((float) NUM_HOSTS) - BATCH_HOSTS);
 			}
 		}
 		
